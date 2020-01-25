@@ -67,12 +67,6 @@ type item struct {
 	Data []byte `json:"data"`
 }
 
-func (h *generatingHandler) run() {
-	for _, s := range h.streams {
-		go s.loop()
-	}
-}
-
 func (s *stream) loop() {
 	for ; ; {
 		s.mx.Lock()
@@ -175,7 +169,9 @@ func main() {
 		[]string{"fast", "medium", "slow"},
 		[]time.Duration{1 * time.Second, 2 * time.Second, 4 * time.Second},
 	)
-	go h.run()
+	for _, s := range h.streams {
+		go s.loop()
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
