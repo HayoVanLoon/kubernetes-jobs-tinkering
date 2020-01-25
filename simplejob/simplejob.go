@@ -52,7 +52,7 @@ func run(scheme, stream string) {
 		time.Sleep(1 * time.Second)
 	}
 
-	fmt.Printf("received %v items", i)
+	fmt.Printf("received %v items\n", i)
 }
 
 func concat(xs, ys []item) []item {
