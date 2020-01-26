@@ -42,24 +42,22 @@ const (
 	endAfter = 16
 )
 
-var client = http.Client{}
-
 func run(j RunnableJob) error {
-	conf, err := j.GetConfig()
+	err := j.RetrieveConfig()
 	if err != nil {
 		return err
 	}
-	j.SetConfig(*conf)
 
 	var all []Item
-	for p := 0; len(all) < endAfter; {
-		is, err := j.Fetch(p)
+	query := 0
+	for ; len(all) < endAfter; {
+		is, err := j.Fetch(query)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		if len(is) > 0 {
-			p = is[len(is)-1].N
 			all = concat(all, is)
+			query = is[len(is)-1].N
 		}
 
 		time.Sleep(delay)
@@ -85,7 +83,7 @@ func main() {
 		s = "http://localhost:8080"
 	}
 
-	j := NewRunnableJob(*n, s, delay)
+	j := NewRunnableJob(*n, s, delay, &http.Client{})
 
 	err := run(j)
 	if err != nil {

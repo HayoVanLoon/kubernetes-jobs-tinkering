@@ -28,8 +28,7 @@ func (i Item) String() string {
 }
 
 type RunnableJob interface {
-	GetConfig() (*JobConfig, error)
-	SetConfig(JobConfig)
+	RetrieveConfig() error
 	Fetch(int) ([]Item, error)
 	Op([]Item)
 	Report([]Item)
@@ -37,13 +36,15 @@ type RunnableJob interface {
 
 type runnableJob struct {
 	Job
-	delay time.Duration
+	delay  time.Duration
+	client *http.Client
 }
 
-func NewRunnableJob(name, scheduler string, delay time.Duration) RunnableJob {
+func NewRunnableJob(name, scheduler string, delay time.Duration, client *http.Client) RunnableJob {
 	return &runnableJob{
-		Job:   Job{Name: name, Scheduler: scheduler},
-		delay: delay,
+		Job:    Job{Name: name, Scheduler: scheduler},
+		delay:  delay,
+		client: client,
 	}
 }
 
@@ -53,32 +54,29 @@ func closeFn(c io.Closer) {
 	}
 }
 
-func (j runnableJob) GetConfig() (*JobConfig, error) {
-	resp, err := client.Get(j.Scheduler + j.Name + "/configs")
+func (j *runnableJob) RetrieveConfig() error {
+	resp, err := j.client.Get(j.Scheduler + j.Name + "/configs")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer closeFn(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received %s", resp.Status)
+		return fmt.Errorf("received %s", resp.Status)
 	}
 
 	jc := &JobConfig{}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = json.Unmarshal(body, jc)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return jc, nil
-}
-
-func (j *runnableJob) SetConfig(jc JobConfig) {
-	j.Config = jc
+	j.Config = *jc
+	return nil
 }
 
 func (j runnableJob) Fetch(from int) ([]Item, error) {
@@ -87,14 +85,14 @@ func (j runnableJob) Fetch(from int) ([]Item, error) {
 		url += "?from=" + strconv.Itoa(from)
 	}
 	log.Println("polling " + url)
-	resp, err := client.Get(url)
+	resp, err := j.client.Get(url)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	is, err := decode(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer closeFn(resp.Body)
 
